@@ -62,7 +62,7 @@ test("an image: the layer under the window and translucent panes", () => {
   assert.match(css, /overflow: hidden/);
   assert.match(css, /background-repeat: no-repeat, repeat/);
   assert.match(css, /rgba\(0, 0, 0, 0\.25\)/);
-  assert.match(css, /color-mix\(in srgb, var\(--bg\) 70%, transparent\)/);
+  assert.match(css, /\.pane:not\(\.pane-browser\) \{ background: color-mix\(in srgb, var\(--bg\) 70%, transparent\)/);
   assert.doesNotMatch(buildCss({ ...s, blur: 0 }, { url: "https://x.dev/a.jpg", media: "image" }), /filter|overflow/);
 });
 

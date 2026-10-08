@@ -138,7 +138,7 @@ export const VIDEO_CLASS = "specterm-wallpaper-video";
  * only the dimming. Blur sits on that layer alone, so it never softens the
  * text. The terminal panes, whose xterm canvas is already transparent, let it
  * through by keeping only `paneOpacity` of the theme's background; the rest of
- * the chrome (tab bar, sidebar, settings) keeps its own.
+ * the chrome (tab bar, sidebar, settings) and browser panes keep their own.
  */
 export function buildCss(s: Settings, source: { url: string; media: Media } | null): string {
   if (!source) return "";
@@ -150,7 +150,7 @@ export function buildCss(s: Settings, source: { url: string; media: Media } | nu
   const blur = s.blur > 0 ? `filter: blur(${s.blur}px);` : "";
   const common = `
 .app { isolation: isolate;${s.blur > 0 ? " overflow: hidden;" : ""} }
-.pane { background: color-mix(in srgb, var(--bg) ${s.paneOpacity}%, transparent); }`;
+.pane:not(.pane-browser) { background: color-mix(in srgb, var(--bg) ${s.paneOpacity}%, transparent); }`;
   if (source.media === "video") {
     return `${common}
 .app::before {
