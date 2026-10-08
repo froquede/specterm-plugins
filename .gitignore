@@ -1,0 +1,3 @@
+node_modules/
+# dist/, host.cjs and mcp.cjs are committed: installing a plugin is a clone
+# with no build step.

@@ -1,0 +1,15 @@
+{
+  "id": "todo",
+  "name": "Todo",
+  "version": "1.0.0",
+  "engines": { "specterm": "^1.3" },
+  "host": "host.cjs",
+  "activation": "view",
+  "panel": "dist/panel.js",
+  "style": "dist/panel.css",
+  "sidebarViews": [{ "id": "todo", "title": "Todo", "icon": "list-checks", "ownHeader": true }],
+  "tabBarButton": { "view": "todo", "icon": "list-checks", "title": "Todo list", "order": 30 },
+  "commands": [
+    { "id": "toggle", "title": "Toggle todo list", "key": "o", "shift": true, "toggleView": "todo" }
+  ]
+}
