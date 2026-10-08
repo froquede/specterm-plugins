@@ -1,67 +1,75 @@
 import type { PluginRendererApi } from "../../shared/specterm-plugin-api.ts";
 import { onLocalChange } from "./bus.ts";
-import { SETTINGS_KEY, buildCss, parseSettings, type Settings } from "./settings.ts";
+import { SETTINGS_KEY, VIDEO_CLASS, buildCss, parseSettings, wallpaperSource } from "./settings.ts";
 
 // The wallpaper's renderer module: loaded in every window after its first
-// terminal has rendered, it puts the image behind the window with one <style>
-// and redraws it when the settings change in any window. The image of a
-// picked file comes from the host as a data: URL and is shown through a blob:
-// URL, so the stylesheet stays small.
+// terminal has rendered, it puts the wallpaper behind the window with one
+// <style> (and, for a video, one muted, looping <video> under the window) and
+// redraws it when the settings change in any window. A picked file loads from
+// disk by its path, so nothing here waits on the plugin's host process.
 
 export function activate(api: PluginRendererApi): () => void {
   const style = document.createElement("style");
   style.dataset.specterm = "wallpaper";
   document.head.appendChild(style);
 
-  let blobUrl: string | null = null;
-  // The revision blobUrl was read at; -1 for none.
-  let blobRevision = -1;
-  // Each apply supersedes the one before, so a slow read never lands late.
-  let generation = 0;
+  let video: HTMLVideoElement | null = null;
 
-  function dropBlob() {
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-    blobUrl = null;
-    blobRevision = -1;
+  function removeVideo() {
+    if (!video) return;
+    video.pause();
+    video.removeAttribute("src");
+    video.load(); // lets go of the decoder and the file
+    video.remove();
+    video = null;
   }
 
-  async function fileUrl(s: Settings): Promise<string | null> {
-    if (blobUrl && blobRevision === s.revision) return blobUrl;
-    const dataUrl = await api.invoke("get");
-    if (typeof dataUrl !== "string") return null;
-    const blob = await (await fetch(dataUrl)).blob();
-    dropBlob();
-    blobUrl = URL.createObjectURL(blob);
-    blobRevision = s.revision;
-    return blobUrl;
-  }
-
-  async function apply() {
-    const mine = ++generation;
-    const s = parseSettings(api.storage.get(SETTINGS_KEY));
-    let url: string | null = null;
-    try {
-      if (s.source === "file") url = await fileUrl(s);
-      else if (s.source === "url") url = s.url;
-    } catch (err) {
-      console.error("[wallpaper] could not load the image:", err);
+  function showVideo(url: string) {
+    const app = document.querySelector(".app");
+    if (!app) return;
+    if (!video) {
+      video = document.createElement("video");
+      video.className = VIDEO_CLASS;
+      video.muted = true;
+      video.loop = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.setAttribute("aria-hidden", "true");
+      video.addEventListener("error", () => console.error("[wallpaper] could not play", video?.src));
     }
-    if (mine !== generation) return;
-    if (s.source !== "file") dropBlob();
-    style.textContent = buildCss(s, url);
+    if (video.parentElement !== app) app.prepend(video);
+    if (video.src !== url) video.src = url;
+    if (!document.hidden) void video.play().catch(() => {});
   }
 
-  void apply();
+  function apply() {
+    const s = parseSettings(api.storage.get(SETTINGS_KEY));
+    const source = wallpaperSource(s);
+    if (source?.media === "video") showVideo(source.url);
+    else removeVideo();
+    style.textContent = buildCss(s, source);
+  }
+
+  // A minimized or hidden window plays nothing: a wallpaper nobody can see
+  // shouldn't keep a decoder busy.
+  const onVisibility = () => {
+    if (!video) return;
+    if (document.hidden) video.pause();
+    else void video.play().catch(() => {});
+  };
+  document.addEventListener("visibilitychange", onVisibility);
+
+  apply();
   const offChange = api.storage.onChange((key) => {
-    if (key === SETTINGS_KEY) void apply();
+    if (key === SETTINGS_KEY) apply();
   });
-  const offLocal = onLocalChange(() => void apply());
+  const offLocal = onLocalChange(apply);
 
   return () => {
-    generation++;
     offChange();
     offLocal();
+    document.removeEventListener("visibilitychange", onVisibility);
     style.remove();
-    dropBlob();
+    removeVideo();
   };
 }

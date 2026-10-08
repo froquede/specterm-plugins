@@ -1,60 +1,53 @@
-// The picked image on disk: one file in the plugin's data folder, replaced in
-// one rename so a window reading it never sees half of it. The panel sends it
-// as a data: URL (what FileReader gives) and every window reads it back the
-// same way.
+// The picked file on disk: one file in the plugin's data folder, named fresh
+// for every pick so no window ever shows a cached copy of the one before, and
+// written under a temporary name then renamed, so a window never reads half
+// of it. The panel sends the bytes; every window then loads the file by its
+// path (see settings.ts, fileUrl).
 
 import fs from "node:fs";
 import path from "node:path";
-import { MAX_BYTES } from "./settings.ts";
+import { MAX_BYTES, TYPES, type Media } from "./settings.ts";
 
-export const FILE_NAME = "wallpaper";
+const PREFIX = "wallpaper-";
 
-const TYPES: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "image/avif": "avif",
-  "image/svg+xml": "svg",
-};
-
-export function parseDataUrl(dataUrl: unknown): { type: string; bytes: Buffer } {
-  if (typeof dataUrl !== "string") throw new Error("expected a data: URL");
-  const m = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl);
-  if (!m || !TYPES[m[1]]) throw new Error("not a supported image (PNG, JPEG, WebP, GIF, AVIF or SVG)");
-  const bytes = Buffer.from(m[2], "base64");
-  if (bytes.length === 0) throw new Error("the image is empty");
-  if (bytes.length > MAX_BYTES) throw new Error(`the image is over ${MAX_BYTES / 1024 / 1024} MB`);
-  return { type: m[1], bytes };
+export interface Stored {
+  path: string;
+  media: Media;
 }
 
-// The type rides in a sidecar so the read needs no sniffing.
-export async function writeImage(dir: string, dataUrl: unknown): Promise<void> {
-  const { type, bytes } = parseDataUrl(dataUrl);
+function toBytes(data: unknown): Buffer {
+  if (data instanceof Uint8Array) return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  throw new Error("expected the file's bytes");
+}
+
+export async function writeWallpaper(dir: string, type: unknown, data: unknown): Promise<Stored> {
+  const kind = typeof type === "string" ? TYPES[type] : undefined;
+  if (!kind) throw new Error("not a supported file (PNG, JPEG, WebP, GIF, AVIF, SVG, MP4 or WebM)");
+  const bytes = toBytes(data);
+  if (bytes.length === 0) throw new Error("the file is empty");
+  if (bytes.length > MAX_BYTES) throw new Error(`the file is over ${MAX_BYTES / 1024 / 1024} MB`);
   await fs.promises.mkdir(dir, { recursive: true });
-  const file = path.join(dir, FILE_NAME);
+  const file = path.join(dir, `${PREFIX}${Date.now().toString(36)}.${kind.ext}`);
   const tmp = `${file}.${process.pid}.tmp`;
   await fs.promises.writeFile(tmp, bytes);
-  await fs.promises.writeFile(`${file}.type`, type);
   await fs.promises.rename(tmp, file);
+  await removeWallpapers(dir, file);
+  return { path: file, media: kind.media };
 }
 
-export async function readImage(dir: string): Promise<string | null> {
-  const file = path.join(dir, FILE_NAME);
+/** Every stored file but `keep`. */
+export async function removeWallpapers(dir: string, keep?: string): Promise<void> {
+  let names: string[];
   try {
-    const [bytes, type] = await Promise.all([
-      fs.promises.readFile(file),
-      fs.promises.readFile(`${file}.type`, "utf8"),
-    ]);
-    if (!TYPES[type.trim()]) return null;
-    return `data:${type.trim()};base64,${bytes.toString("base64")}`;
+    names = await fs.promises.readdir(dir);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
     throw err;
   }
-}
-
-export async function removeImage(dir: string): Promise<void> {
-  const file = path.join(dir, FILE_NAME);
-  await Promise.all([fs.promises.rm(file, { force: true }), fs.promises.rm(`${file}.type`, { force: true })]);
+  await Promise.all(
+    names
+      .filter((n) => n.startsWith(PREFIX) && path.join(dir, n) !== keep)
+      .map((n) => fs.promises.rm(path.join(dir, n), { force: true }))
+  );
 }

@@ -39,60 +39,56 @@ var import_node_fs = __toESM(require("node:fs"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
 
 // wallpaper/src/settings.ts
-var MAX_BYTES = 25 * 1024 * 1024;
+var MAX_BYTES = 300 * 1024 * 1024;
+var TYPES = {
+  "image/png": { ext: "png", media: "image" },
+  "image/jpeg": { ext: "jpg", media: "image" },
+  "image/webp": { ext: "webp", media: "image" },
+  "image/gif": { ext: "gif", media: "image" },
+  "image/avif": { ext: "avif", media: "image" },
+  "image/svg+xml": { ext: "svg", media: "image" },
+  "video/mp4": { ext: "mp4", media: "video" },
+  "video/webm": { ext: "webm", media: "video" }
+};
 
 // wallpaper/src/image.ts
-var FILE_NAME = "wallpaper";
-var TYPES = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "image/avif": "avif",
-  "image/svg+xml": "svg"
-};
-function parseDataUrl(dataUrl) {
-  if (typeof dataUrl !== "string") throw new Error("expected a data: URL");
-  const m = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl);
-  if (!m || !TYPES[m[1]]) throw new Error("not a supported image (PNG, JPEG, WebP, GIF, AVIF or SVG)");
-  const bytes = Buffer.from(m[2], "base64");
-  if (bytes.length === 0) throw new Error("the image is empty");
-  if (bytes.length > MAX_BYTES) throw new Error(`the image is over ${MAX_BYTES / 1024 / 1024} MB`);
-  return { type: m[1], bytes };
+var PREFIX = "wallpaper-";
+function toBytes(data) {
+  if (data instanceof Uint8Array) return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  throw new Error("expected the file's bytes");
 }
-async function writeImage(dir, dataUrl) {
-  const { type, bytes } = parseDataUrl(dataUrl);
+async function writeWallpaper(dir, type, data) {
+  const kind = typeof type === "string" ? TYPES[type] : void 0;
+  if (!kind) throw new Error("not a supported file (PNG, JPEG, WebP, GIF, AVIF, SVG, MP4 or WebM)");
+  const bytes = toBytes(data);
+  if (bytes.length === 0) throw new Error("the file is empty");
+  if (bytes.length > MAX_BYTES) throw new Error(`the file is over ${MAX_BYTES / 1024 / 1024} MB`);
   await import_node_fs.default.promises.mkdir(dir, { recursive: true });
-  const file = import_node_path.default.join(dir, FILE_NAME);
+  const file = import_node_path.default.join(dir, `${PREFIX}${Date.now().toString(36)}.${kind.ext}`);
   const tmp = `${file}.${process.pid}.tmp`;
   await import_node_fs.default.promises.writeFile(tmp, bytes);
-  await import_node_fs.default.promises.writeFile(`${file}.type`, type);
   await import_node_fs.default.promises.rename(tmp, file);
+  await removeWallpapers(dir, file);
+  return { path: file, media: kind.media };
 }
-async function readImage(dir) {
-  const file = import_node_path.default.join(dir, FILE_NAME);
+async function removeWallpapers(dir, keep) {
+  let names;
   try {
-    const [bytes, type] = await Promise.all([
-      import_node_fs.default.promises.readFile(file),
-      import_node_fs.default.promises.readFile(`${file}.type`, "utf8")
-    ]);
-    if (!TYPES[type.trim()]) return null;
-    return `data:${type.trim()};base64,${bytes.toString("base64")}`;
+    names = await import_node_fs.default.promises.readdir(dir);
   } catch (err) {
-    if (err.code === "ENOENT") return null;
+    if (err.code === "ENOENT") return;
     throw err;
   }
-}
-async function removeImage(dir) {
-  const file = import_node_path.default.join(dir, FILE_NAME);
-  await Promise.all([import_node_fs.default.promises.rm(file, { force: true }), import_node_fs.default.promises.rm(`${file}.type`, { force: true })]);
+  await Promise.all(
+    names.filter((n) => n.startsWith(PREFIX) && import_node_path.default.join(dir, n) !== keep).map((n) => import_node_fs.default.promises.rm(import_node_path.default.join(dir, n), { force: true }))
+  );
 }
 
 // wallpaper/src/host.ts
 function activate(ctx) {
-  ctx.handle("get", () => readImage(ctx.storagePath));
-  ctx.handle("set", (dataUrl) => writeImage(ctx.storagePath, dataUrl));
-  ctx.handle("clear", () => removeImage(ctx.storagePath));
+  ctx.handle("set", (type, bytes) => writeWallpaper(ctx.storagePath, type, bytes));
+  ctx.handle("clear", () => removeWallpapers(ctx.storagePath));
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

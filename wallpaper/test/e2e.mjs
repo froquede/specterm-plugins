@@ -59,7 +59,14 @@ const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "specterm-wallpaper-")
 fs.mkdirSync(path.join(userDataDir, "plugins"));
 fs.symlinkSync(pluginRoot, path.join(userDataDir, "plugins", "wallpaper"), "dir");
 fs.writeFileSync(path.join(userDataDir, "plugins.json"), JSON.stringify({ enabled: { wallpaper: true }, contributions: [] }));
-const imageOnDisk = path.join(userDataDir, "plugin-data", "wallpaper", "wallpaper");
+const dataDir = path.join(userDataDir, "plugin-data", "wallpaper");
+const stored = () => {
+  try {
+    return fs.readdirSync(dataDir);
+  } catch {
+    return [];
+  }
+};
 const shotDir = process.env.E2E_SHOTS ?? fs.mkdtempSync(path.join(os.tmpdir(), "specterm-wallpaper-shots-"));
 
 const layer = (win) =>
@@ -71,6 +78,10 @@ const layer = (win) =>
       image: before.backgroundImage,
       filter: before.filter,
       pane: pane ? getComputedStyle(pane).backgroundColor : "",
+      video: (() => {
+        const v = document.querySelector(".specterm-wallpaper-video");
+        return v ? { time: v.currentTime, paused: v.paused, fit: getComputedStyle(v).objectFit, z: getComputedStyle(v).zIndex } : null;
+      })(),
     };
   });
 
@@ -113,10 +124,11 @@ try {
   });
   fs.writeFileSync(picked, Buffer.from(drawn.split(",")[1], "base64"));
   await view.locator('input[type="file"]').setInputFiles(picked);
-  check("a picked file is drawn behind the window", await until("blob", async () => /url\("blob:/.test((await layer(win)).image)));
+  check("a picked file is drawn behind the window", await until("file", async () => /url\("file:\/\/.*wallpaper-\w+\.png"\)/.test((await layer(win)).image)), (await layer(win)).image);
   check(
     "and kept by the host in its data folder",
-    fs.existsSync(imageOnDisk) && fs.readFileSync(imageOnDisk).equals(fs.readFileSync(picked))
+    stored().length === 1 && fs.readFileSync(path.join(dataDir, stored()[0])).equals(fs.readFileSync(picked)),
+    stored().join(",")
   );
   check("the panel shows it", await until("preview", () => view.locator(".wp-preview img").isVisible()));
   const pane = (await layer(win)).pane;
@@ -135,9 +147,54 @@ try {
   // 4. Reloading the window draws the same wallpaper from storage and disk.
   await win.reload();
   await win.waitForSelector(".xterm", { timeout: 20000 });
-  check("a reload draws it again", await until("reload", async () => /url\("blob:/.test((await layer(win)).image), { timeout: 15000 }));
+  check("a reload draws it again", await until("reload", async () => /url\("file:/.test((await layer(win)).image), { timeout: 15000 }));
 
-  // 5. A link: refused when not http(s), used as is otherwise.
+  // 5. A video: recorded here from a canvas, played under the window.
+  if (!(await view.isVisible())) await win.keyboard.press(TOGGLE_KEY);
+  await until("view again", () => view.isVisible());
+  const recorded = await win.evaluate(async () => {
+    const c = Object.assign(document.createElement("canvas"), { width: 640, height: 360 });
+    const g = c.getContext("2d");
+    const rec = new MediaRecorder(c.captureStream(30), { mimeType: "video/webm" });
+    const chunks = [];
+    rec.ondataavailable = (e) => chunks.push(e.data);
+    const done = new Promise((r) => (rec.onstop = r));
+    rec.start();
+    const t0 = performance.now();
+    await new Promise((resolve) => {
+      const draw = () => {
+        const t = (performance.now() - t0) / 1000;
+        g.fillStyle = `hsl(${(t * 240) % 360} 80% 55%)`;
+        g.fillRect(0, 0, 640, 360);
+        g.fillStyle = "#fff";
+        g.fillRect(((t * 400) % 700) - 60, 140, 80, 80);
+        if (t < 2) requestAnimationFrame(draw);
+        else resolve();
+      };
+      draw();
+    });
+    rec.stop();
+    await done;
+    const buf = await new Blob(chunks, { type: "video/webm" }).arrayBuffer();
+    let s = "";
+    for (const b of new Uint8Array(buf)) s += String.fromCharCode(b);
+    return btoa(s);
+  });
+  const clip = path.join(shotDir, "clip.webm");
+  fs.writeFileSync(clip, Buffer.from(recorded, "base64"));
+  await view.locator('input[type="file"]').setInputFiles(clip);
+  check("a picked video plays under the window", await until("video", async () => {
+    const v = (await layer(win)).video;
+    return v && !v.paused && v.time > 0.2;
+  }, { timeout: 15000 }), JSON.stringify((await layer(win)).video));
+  const vl = await layer(win);
+  check("under the dimming, filling the window", vl.video?.fit === "cover" && vl.video?.z === "-2" && vl.image.startsWith("linear-gradient") && !vl.image.includes("url("), JSON.stringify(vl));
+  check("the old picture is gone from disk", stored().length === 1 && stored()[0].endsWith(".webm"), stored().join(","));
+  check("the panel previews the video", await until("preview video", () => view.locator(".wp-preview video").isVisible()));
+  await new Promise((r) => setTimeout(r, 700));
+  await win.screenshot({ path: path.join(shotDir, "video.png") });
+
+  // 6. A link: refused when not http(s), used as is otherwise.
   if (!(await view.isVisible())) await win.keyboard.press(TOGGLE_KEY);
   await until("view again", () => view.isVisible());
   const urlInput = view.locator(".wp-input");
@@ -152,11 +209,12 @@ try {
     (await layer(win)).image
   );
 
-  // 6. Remove takes it all away.
+  // 7. Remove takes it all away.
   await view.locator(".wp-btn", { hasText: "Remove" }).click();
   check("Remove clears the layer", await until("none", async () => (await layer(win)).image === "none"));
   const paneAfter = (await layer(win)).pane;
   check("and the panes are opaque again", !/0\.\d+\)/.test(paneAfter), paneAfter);
+  check("no video left playing", (await layer(win)).video === null);
 } catch (err) {
   check(`no exception (${err.message})`, false);
 } finally {

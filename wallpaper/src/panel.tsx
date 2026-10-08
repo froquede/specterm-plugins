@@ -4,11 +4,22 @@ import IconImage from "lucide-solid/icons/image";
 import IconX from "lucide-solid/icons/x";
 import type { PluginPanelApi } from "../../shared/specterm-plugin-api.ts";
 import { notifyLocalChange } from "./bus.ts";
-import { MAX_BLUR, MAX_BYTES, SETTINGS_KEY, isImageUrl, parseSettings, type Fit, type Settings } from "./settings.ts";
+import {
+  MAX_BLUR,
+  MAX_BYTES,
+  SETTINGS_KEY,
+  TYPES,
+  isWebUrl,
+  parseSettings,
+  wallpaperSource,
+  type Fit,
+  type Media,
+  type Settings,
+} from "./settings.ts";
 import "./panel.css";
 
-// The wallpaper's settings: pick a file or paste a link, then tune how much
-// the terminals let it through. Every change is written to plugin storage at
+// The wallpaper's settings: pick an image, a GIF or a video, or paste a link,
+// then tune how much the terminals let it through. Every change is written to plugin storage at
 // once; the renderer module (renderer.ts) draws it in every window.
 
 const FITS: { value: Fit; label: string }[] = [
@@ -17,20 +28,12 @@ const FITS: { value: Fit; label: string }[] = [
   { value: "tile", label: "Tile" },
 ];
 
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("could not read the file"));
-    reader.readAsDataURL(file);
-  });
-}
+const ACCEPT = Object.keys(TYPES).join(",");
 
 function WallpaperPanel(props: { api: PluginPanelApi }) {
   const { api } = props;
   const [settings, setSettings] = createSignal<Settings>(parseSettings(api.storage.get(SETTINGS_KEY)));
   const [urlDraft, setUrlDraft] = createSignal(settings().url);
-  const [preview, setPreview] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   let fileInput!: HTMLInputElement;
@@ -47,38 +50,27 @@ function WallpaperPanel(props: { api: PluginPanelApi }) {
     notifyLocalChange();
   }
 
-  // The preview of a picked file is read back from the host, so it shows
-  // what every window shows.
-  async function loadPreview() {
-    const s = settings();
-    if (s.source === "url") return setPreview(s.url);
-    if (s.source !== "file") return setPreview(null);
-    try {
-      const dataUrl = await api.invoke("get");
-      setPreview(typeof dataUrl === "string" ? dataUrl : null);
-    } catch {
-      setPreview(null);
-    }
-  }
-  void loadPreview();
-
   const offChange = api.storage.onChange((key) => {
     if (key !== SETTINGS_KEY) return;
     setSettings(parseSettings(api.storage.get(SETTINGS_KEY)));
     setUrlDraft(settings().url);
-    void loadPreview();
   });
   onCleanup(offChange);
+
+  const preview = () => wallpaperSource(settings());
 
   async function pickFile(file: File | undefined) {
     if (!file) return;
     setError(null);
-    if (file.size > MAX_BYTES) return setError(`The image is over ${MAX_BYTES / 1024 / 1024} MB.`);
+    if (!TYPES[file.type]) return setError("Pick a PNG, JPEG, WebP, GIF, AVIF, SVG, MP4 or WebM file.");
+    if (file.size > MAX_BYTES) return setError(`The file is over ${MAX_BYTES / 1024 / 1024} MB.`);
     setBusy(true);
     try {
-      await api.invoke("set", await readAsDataUrl(file));
-      save({ source: "file", revision: settings().revision + 1 });
-      await loadPreview();
+      const stored = (await api.invoke("set", file.type, new Uint8Array(await file.arrayBuffer()))) as {
+        path: string;
+        media: Media;
+      };
+      save({ source: "file", filePath: stored.path, fileMedia: stored.media });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -90,17 +82,15 @@ function WallpaperPanel(props: { api: PluginPanelApi }) {
   function useUrl(e: Event) {
     e.preventDefault();
     const url = urlDraft().trim();
-    if (!isImageUrl(url)) return setError("Paste an http(s) link to an image.");
+    if (!isWebUrl(url)) return setError("Paste an http(s) link to an image or a video.");
     setError(null);
     save({ source: "url", url });
-    setPreview(url);
   }
 
   async function remove() {
     setError(null);
     const wasFile = settings().source === "file";
-    save({ source: null });
-    setPreview(null);
+    save({ source: null, filePath: "" });
     if (wasFile) await api.invoke("clear").catch(() => {});
   }
 
@@ -136,14 +126,20 @@ function WallpaperPanel(props: { api: PluginPanelApi }) {
 
       <div class="wp-scroll">
         <div class="wp-preview" classList={{ "wp-preview-empty": !preview() }}>
-          <Show when={preview()} fallback={<IconImage size={28} />}>
-            {(src) => <img src={src()} alt="" />}
+          <Show when={preview()} keyed fallback={<IconImage size={28} />}>
+            {(src) =>
+              src.media === "video" ? (
+                <video src={src.url} muted loop autoplay playsinline />
+              ) : (
+                <img src={src.url} alt="" />
+              )
+            }
           </Show>
         </div>
 
         <div class="wp-row">
           <button class="wp-btn wp-btn-primary" disabled={busy()} onClick={() => fileInput.click()}>
-            {busy() ? "Saving…" : "Choose image…"}
+            {busy() ? "Saving…" : "Choose file…"}
           </button>
           <Show when={settings().source}>
             <button class="wp-btn" onClick={remove}>
@@ -153,7 +149,7 @@ function WallpaperPanel(props: { api: PluginPanelApi }) {
           <input
             ref={fileInput}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml"
+            accept={ACCEPT}
             hidden
             onChange={(e) => pickFile(e.currentTarget.files?.[0])}
           />
@@ -163,7 +159,7 @@ function WallpaperPanel(props: { api: PluginPanelApi }) {
           <input
             class="wp-input"
             type="url"
-            placeholder="or paste an image link"
+            placeholder="or paste a link"
             value={urlDraft()}
             onInput={(e) => setUrlDraft(e.currentTarget.value)}
           />
@@ -178,7 +174,7 @@ function WallpaperPanel(props: { api: PluginPanelApi }) {
 
         <div class="wp-section">
           {slider("Terminal background", "paneOpacity", 100, "%")}
-          {slider("Dim image", "dim", 100, "%")}
+          {slider("Dim", "dim", 100, "%")}
           {slider("Blur", "blur", MAX_BLUR, "px")}
         </div>
 

@@ -5,7 +5,7 @@ Plugins for [Specterm](https://github.com/froquede/specterm), one folder each.
 | Plugin | What it does |
 |---|---|
 | [todo](todo/) | A todo list in the sidebar that any Claude Code session can read and change. |
-| [wallpaper](wallpaper/) | An image behind the terminals, picked from a file or a link. |
+| [wallpaper](wallpaper/) | An image, GIF or looping video behind the terminals, from a file or a link. |
 
 ## Installing one
 

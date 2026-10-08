@@ -1,36 +1,32 @@
-import { S as u, o as g, p as v, b as m } from "./settings-DV_vJHko.js";
-function y(l) {
-  const r = document.createElement("style");
-  r.dataset.specterm = "wallpaper", document.head.appendChild(r);
-  let t = null, a = -1, i = 0;
-  function s() {
-    t && URL.revokeObjectURL(t), t = null, a = -1;
+import { S as c, o as p, p as m, w as f, b as v, V as h } from "./settings-D_3eE5sp.js";
+function g(a) {
+  const o = document.createElement("style");
+  o.dataset.specterm = "wallpaper", document.head.appendChild(o);
+  let e = null;
+  function i() {
+    e && (e.pause(), e.removeAttribute("src"), e.load(), e.remove(), e = null);
   }
-  async function f(o) {
-    if (t && a === o.revision) return t;
-    const e = await l.invoke("get");
-    if (typeof e != "string") return null;
-    const n = await (await fetch(e)).blob();
-    return s(), t = URL.createObjectURL(n), a = o.revision, t;
+  function l(t) {
+    const n = document.querySelector(".app");
+    n && (e || (e = document.createElement("video"), e.className = h, e.muted = !0, e.loop = !0, e.autoplay = !0, e.playsInline = !0, e.setAttribute("aria-hidden", "true"), e.addEventListener("error", () => console.error("[wallpaper] could not play", e?.src))), e.parentElement !== n && n.prepend(e), e.src !== t && (e.src = t), document.hidden || e.play().catch(() => {
+    }));
   }
-  async function c() {
-    const o = ++i, e = v(l.storage.get(u));
-    let n = null;
-    try {
-      e.source === "file" ? n = await f(e) : e.source === "url" && (n = e.url);
-    } catch (p) {
-      console.error("[wallpaper] could not load the image:", p);
-    }
-    o === i && (e.source !== "file" && s(), r.textContent = m(e, n));
+  function r() {
+    const t = m(a.storage.get(c)), n = f(t);
+    n?.media === "video" ? l(n.url) : i(), o.textContent = v(t, n);
   }
-  c();
-  const d = l.storage.onChange((o) => {
-    o === u && c();
-  }), b = g(() => void c());
+  const s = () => {
+    e && (document.hidden ? e.pause() : e.play().catch(() => {
+    }));
+  };
+  document.addEventListener("visibilitychange", s), r();
+  const d = a.storage.onChange((t) => {
+    t === c && r();
+  }), u = p(r);
   return () => {
-    i++, d(), b(), r.remove(), s();
+    d(), u(), document.removeEventListener("visibilitychange", s), o.remove(), i();
   };
 }
 export {
-  y as activate
+  g as activate
 };
