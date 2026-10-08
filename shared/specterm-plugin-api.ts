@@ -40,3 +40,16 @@ export interface PluginHostContext {
   clearTimer(handle: unknown): void;
   onDispose(fn: () => void): void;
 }
+
+/** What a renderer module's `activate(api)` is given (1.3). Loaded in every
+ *  window once its first terminal has rendered, before any view is open. */
+export interface PluginRendererApi {
+  apiVersion: string;
+  pluginId: string;
+  invoke(method: string, ...args: unknown[]): Promise<unknown>;
+  on(event: string, cb: (payload: unknown) => void): () => void;
+  storage: PluginStorage;
+  showView(viewId: string): void;
+  openFile(path: string, mode?: "tab" | "split"): void;
+  commands: { register(name: string, fn: () => void): () => void };
+}
