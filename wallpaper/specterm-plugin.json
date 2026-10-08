@@ -1,0 +1,16 @@
+{
+  "id": "wallpaper",
+  "name": "Wallpaper",
+  "version": "1.0.0",
+  "engines": { "specterm": "^1.3" },
+  "host": "host.cjs",
+  "activation": "view",
+  "panel": "dist/panel.js",
+  "style": "dist/panel.css",
+  "renderer": "dist/renderer.js",
+  "sidebarViews": [{ "id": "wallpaper", "title": "Wallpaper", "icon": "image", "ownHeader": true }],
+  "tabBarButton": { "view": "wallpaper", "icon": "image", "title": "Wallpaper", "order": 40 },
+  "commands": [
+    { "id": "toggle", "title": "Toggle wallpaper settings", "key": "j", "shift": true, "toggleView": "wallpaper" }
+  ]
+}
