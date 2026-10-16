@@ -35,7 +35,12 @@ export interface PluginHostContext {
   handle(method: string, fn: (...args: any[]) => unknown): { dispose(): void };
   emit(event: string, payload?: unknown): void;
   setBadge(value: number | "dot" | null): void;
+  /** A heads-up under the tab-bar button, in every window where the view
+   *  isn't open (1.1). Clicking it opens the view and hands `payload` to
+   *  the panel's onReveal. */
+  toast(toast: { title: string; tag?: string; body?: string; more?: number; payload?: unknown }): void;
   openExternal(url: string): void;
+  setInterval(fn: () => void, ms: number): unknown;
   setTimeout(fn: () => void, ms: number): unknown;
   clearTimer(handle: unknown): void;
   onDispose(fn: () => void): void;

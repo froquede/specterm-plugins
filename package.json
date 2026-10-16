@@ -5,13 +5,15 @@
   "description": "Specterm plugins, one folder each",
   "type": "module",
   "scripts": {
-    "build": "npm run build:todo && npm run build:wallpaper",
+    "build": "npm run build:todo && npm run build:wallpaper && npm run build:gatus",
     "build:todo": "vite build --config todo/vite.config.ts && node todo/build.mjs",
     "build:wallpaper": "vite build --config wallpaper/vite.config.ts && node wallpaper/build.mjs",
+    "build:gatus": "vite build --config gatus/vite.config.ts && node gatus/build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test todo/test/*.test.mjs wallpaper/test/*.test.mjs",
+    "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test todo/test/*.test.mjs wallpaper/test/*.test.mjs gatus/test/*.test.mjs",
     "e2e:todo": "node todo/test/e2e.mjs",
-    "e2e:wallpaper": "node wallpaper/test/e2e.mjs"
+    "e2e:wallpaper": "node wallpaper/test/e2e.mjs",
+    "e2e:gatus": "node gatus/test/e2e.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.30.1",

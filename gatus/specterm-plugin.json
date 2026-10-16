@@ -1,0 +1,15 @@
+{
+  "id": "gatus",
+  "name": "Gatus",
+  "version": "1.0.0",
+  "engines": { "specterm": "^1.3" },
+  "host": "host.cjs",
+  "activation": "startup",
+  "panel": "dist/panel.js",
+  "style": "dist/panel.css",
+  "sidebarViews": [{ "id": "gatus", "title": "Gatus", "icon": "activity", "ownHeader": true }],
+  "tabBarButton": { "view": "gatus", "icon": "activity", "title": "Gatus", "order": 50 },
+  "commands": [
+    { "id": "toggle", "title": "Toggle Gatus status", "key": "g", "shift": true, "toggleView": "gatus" }
+  ]
+}
