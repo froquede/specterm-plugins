@@ -1,4 +1,4 @@
-import { S as c, o as p, p as m, w as f, b as v, V as h } from "./settings-0UxQx4GH.js";
+import { S as c, o as p, p as m, w as f, b as v, V as h } from "./settings.js";
 function g(a) {
   const o = document.createElement("style");
   o.dataset.specterm = "wallpaper", document.head.appendChild(o);

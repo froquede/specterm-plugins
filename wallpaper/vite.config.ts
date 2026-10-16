@@ -21,5 +21,11 @@ export default defineConfig({
     emptyOutDir: true,
     // Electron 33, the Chromium Specterm ships.
     target: "chrome130",
+    rollupOptions: {
+      // No hash in the shared chunk's name: dist/ is committed, and a hashed
+      // name changes on every rebuild, leaving a new file that is easy to
+      // forget to add.
+      output: { chunkFileNames: "[name].js" },
+    },
   },
 });
