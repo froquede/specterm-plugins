@@ -1,0 +1,269 @@
+/* The Zabbix panel. Specterm draws the card around it (.plugin-view: the
+   sidebar's width, border and background); this styles what is inside, with
+   the app's theme variables. */
+.zb-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  color: var(--fg);
+  overflow: hidden;
+}
+
+.zb-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.zb-title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.zb-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.zb-status {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.zb-empty {
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.zb-error {
+  font-size: 12px;
+  color: var(--ansi-red);
+  overflow-wrap: anywhere;
+}
+
+.zb-incidents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.zb-incident-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.zb-incident-head:hover {
+  background: var(--bg-hover);
+}
+.zb-incident-head svg,
+.zb-section-toggle svg {
+  flex-shrink: 0;
+  color: var(--fg-muted);
+  transition: transform 120ms ease;
+}
+.zb-incident-head.expanded svg,
+.zb-section-toggle.expanded svg {
+  transform: rotate(90deg);
+}
+.zb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ansi-red);
+  flex-shrink: 0;
+}
+.zb-incident-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.zb-since {
+  color: var(--fg-faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.zb-checks {
+  margin: 0 0 4px;
+  padding: 0 0 0 20px;
+  list-style: none;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.zb-quiet {
+  padding-left: 18px;
+}
+
+.zb-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.zb-section-toggle:hover {
+  color: var(--fg);
+}
+
+.zb-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.zb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.zb-field > span {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.zb-field small,
+.zb-hint {
+  color: var(--fg-faint);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.zb-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.zb-input {
+  min-width: 0;
+  background: var(--bg-chrome);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+.zb-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.zb-num {
+  width: 80px;
+}
+
+.zb-row {
+  display: flex;
+  gap: 6px;
+}
+.zb-btn {
+  background: var(--bg-chrome);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.zb-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+.zb-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.zb-btn-primary {
+  flex: 1;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.zb-btn-primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.1);
+}
+
+.zb-icon-btn {
+  display: flex;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.zb-icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.zb-icon-btn:disabled {
+  opacity: 0.5;
+}
+
+/* Severity, as Zabbix colours it, from the app's palette. */
+.zb-dot[data-sev="5"] { background: var(--ansi-red); }
+.zb-dot[data-sev="4"] { background: var(--ansi-magenta); }
+.zb-dot[data-sev="3"] { background: var(--ansi-yellow); }
+.zb-dot[data-sev="2"] { background: var(--ansi-yellow); opacity: 0.6; }
+.zb-dot[data-sev="1"] { background: var(--ansi-blue); }
+.zb-dot[data-sev="0"] { background: var(--fg-muted); }
+.zb-dot[data-sev="-1"] { background: var(--ansi-red); }
+
+.zb-problem {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: default;
+}
+.zb-problem:hover,
+.zb-problem:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+.zb-problem .zb-dot {
+  align-self: center;
+}
+.zb-problem-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.zb-tag {
+  font-size: 10px;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.zb-select {
+  width: auto;
+}

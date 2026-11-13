@@ -1,0 +1,15 @@
+{
+  "id": "zabbix",
+  "name": "Zabbix",
+  "version": "1.0.0",
+  "engines": { "specterm": "^1.3" },
+  "host": "host.cjs",
+  "activation": "startup",
+  "panel": "dist/panel.js",
+  "style": "dist/panel.css",
+  "sidebarViews": [{ "id": "zabbix", "title": "Zabbix", "icon": "bell", "ownHeader": true }],
+  "tabBarButton": { "view": "zabbix", "icon": "bell", "title": "Zabbix", "order": 51 },
+  "commands": [
+    { "id": "toggle", "title": "Toggle Zabbix problems", "key": "x", "shift": true, "toggleView": "zabbix" }
+  ]
+}

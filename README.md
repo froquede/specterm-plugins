@@ -7,6 +7,7 @@ Plugins for [Specterm](https://github.com/froquede/specterm), one folder each.
 | [todo](todo/) | A todo list in the sidebar that any Claude Code session can read and change. |
 | [wallpaper](wallpaper/) | An image, GIF or looping video behind the terminals, from a file or a link. |
 | [gatus](gatus/) | Alerts on what goes down in a Gatus status page, bundled so one outage is one alert. |
+| [zabbix](zabbix/) | Alerts on the problems that matter in a Zabbix server, bundled the same way. |
 
 ## Installing one
 
