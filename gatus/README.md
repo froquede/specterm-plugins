@@ -40,6 +40,16 @@ The count is over results, not polls, so how often a check runs matters. A
 check Gatus runs once a day needs N days to alert, so put checks like that on
 the first list.
 
+## The right-click menu
+
+Right-click (or `Shift+F10`) an alert or a check: **Ask Claude about it**
+opens a terminal tab running Claude Code, in the directory of the pane in use,
+asking it to look into those checks read only and wait. The prompt names them
+by key and gives the status API's address, so nothing from Gatus ends up on a
+command line (a check whose key has a character the shell could misread gets
+no such item). Needs Specterm 1.4 or later. **Open in Gatus** and **Copy
+text** are there too.
+
 ## How it works
 
 The host module (`host.cjs`) starts with Specterm (`"activation": "startup"`)

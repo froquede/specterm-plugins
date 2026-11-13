@@ -26,6 +26,11 @@ export interface PluginPanelApi {
   storage: PluginStorage;
   onActiveFile(cb: (path: string | null) => void): () => void;
   showView(viewId: string): void;
+  /** A new terminal tab with the one-line `command` typed at its prompt;
+   *  `run` also presses Enter (1.4). */
+  openTerminal?(opts: { command: string; cwd?: string; run?: boolean }): void;
+  /** (1.4) */
+  copyText?(text: string): Promise<void>;
 }
 
 /** What a host module's `activate(ctx)` is given. */

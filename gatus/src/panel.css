@@ -225,3 +225,14 @@
 .gt-icon-btn:disabled {
   opacity: 0.5;
 }
+
+.gt-check-row {
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: -4px;
+}
+.gt-check-row:hover,
+.gt-check-row:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}

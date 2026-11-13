@@ -6,7 +6,7 @@
 // plugin is symlinked into a throwaway profile's plugins folder and switched
 // on.
 //
-// Run: npm run build:gatus && npm run e2e:gatus
+// Run: npm run build:gatus && xvfb-run -a npm run e2e:gatus
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
@@ -177,6 +177,17 @@ try {
     "with the incident's checks shown",
     await until("expanded", async () => /shop \/ web/.test(await view.locator('[data-incident="check:shop_web"] .gt-checks').textContent()))
   );
+  await view.locator('[data-incident="check:shop_web"] .gt-check-row').click({ button: "right" });
+  const menu = win.locator(".sp-menu");
+  check("a right click on a check opens the menu", await until("menu", () => menu.isVisible()));
+  const items = await menu.locator(".sp-menu-item").allTextContents();
+  check(
+    "with Ask Claude, Open in Gatus and Copy",
+    ["Ask Claude about it", "Open in Gatus", "Copy text"].every((t) => items.includes(t)),
+    JSON.stringify(items)
+  );
+  await win.keyboard.press("Escape");
+  check("Escape closes it", await until("menu gone", async () => (await menu.count()) === 0));
   await closeView();
 
   // 6. Back up: one recovery toast, badge cleared.

@@ -5,14 +5,18 @@ import IconRefresh from "lucide-solid/icons/refresh-cw";
 import IconExternal from "lucide-solid/icons/external-link";
 import IconChevronRight from "lucide-solid/icons/chevron-right";
 import type { PluginPanelApi } from "../../shared/specterm-plugin-api.ts";
-import { type Incident, type State, label } from "./engine.ts";
+import { ContextMenu, menuAt, opensMenu, type MenuItem, type MenuRequest } from "../../shared/context-menu.tsx";
+import { claudeCommand } from "../../shared/ask-claude.ts";
+import { type Check, type Incident, type State, label } from "./engine.ts";
 import { LIMITS } from "./settings.ts";
 import type { PublicSettings } from "./host.ts";
+import "../../shared/context-menu.css";
 import "./panel.css";
 
 // The Gatus panel: what is down now, what is failing below the alert
 // threshold, and the settings. The host polls and decides; the panel only
-// shows its snapshot and sends settings back.
+// shows its snapshot, sends settings back, and offers a right-click menu on
+// every incident and check.
 
 type Snapshot = State & { configured: boolean; url: string };
 
@@ -25,8 +29,58 @@ const store = createRoot(() => {
   const [showSettings, setShowSettings] = createSignal(false);
   const [showQuiet, setShowQuiet] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  return { snap, setSnap, config, setConfig, open, setOpen, showSettings, setShowSettings, showQuiet, setShowQuiet, error, setError };
+  const [menu, setMenu] = createSignal<MenuRequest | null>(null);
+  return { snap, setSnap, config, setConfig, open, setOpen, showSettings, setShowSettings, showQuiet, setShowQuiet, error, setError, menu, setMenu };
 });
+
+// Where "Ask Claude" opens its terminal: the directory of the pane in use.
+let activeCwd: string | null = null;
+
+const checkLink = (base: string, c: Check) => `${base}/endpoints/${encodeURIComponent(c.key)}`;
+
+/** The prompt names the checks only by key, and Claude reads their results
+ *  from Gatus: names never go on the command line. */
+function askClaudeCommand(base: string, checks: Check[], down: boolean): string | null {
+  const keys = checks.slice(0, 20).map((c) => c.key).join(", ");
+  const more = checks.length > 20 ? ` and ${checks.length - 20} more` : "";
+  const what = checks.length
+    ? `the Gatus ${checks.length === 1 ? "check" : "checks"} ${keys}${more} on ${base} ` +
+      `(GET ${base}/api/v1/endpoints/KEY/statuses returns the recent results of each)`
+    : `the Gatus status page ${base}, which is not answering`;
+  return claudeCommand(
+    `Look into ${what}. ${down ? "They are failing. " : ""}Read only: change nothing. ` +
+      `Tell me what is wrong and the likely cause, then wait for what I want to do.`
+  );
+}
+
+function menuFor(api: PluginPanelApi, e: MouseEvent | KeyboardEvent, checks: Check[], text: string) {
+  e.preventDefault();
+  e.stopPropagation();
+  const base = store.snap()?.url ?? "";
+  const items: MenuItem[] = [];
+  const cmd = api.openTerminal && base ? askClaudeCommand(base, checks, true) : null;
+  if (cmd) {
+    items.push({ label: "Ask Claude about it", run: () => api.openTerminal!({ command: cmd, cwd: activeCwd ?? undefined, run: true }) });
+    items.push("separator");
+  }
+  if (base && checks.length === 1) items.push({ label: "Open in Gatus", run: () => api.openExternal(checkLink(base, checks[0])) });
+  const copy = (s: string) => void (api.copyText ? api.copyText(s) : navigator.clipboard.writeText(s)).catch(() => {});
+  items.push({ label: "Copy text", run: () => copy(text) });
+  store.setMenu({ ...menuAt(e), items });
+}
+
+function CheckRow(props: { api: PluginPanelApi; check: Check }) {
+  return (
+    <li
+      class="gt-check-row"
+      tabIndex={0}
+      onContextMenu={(e) => menuFor(props.api, e, [props.check], label(props.check))}
+      onKeyDown={(e) => opensMenu(e) && menuFor(props.api, e, [props.check], label(props.check))}
+    >
+      {label(props.check)}
+    </li>
+  );
+}
 
 const toggle = (id: string, force?: boolean) =>
   store.setOpen((s) => {
@@ -45,11 +99,18 @@ function ago(iso: string | null): string {
   return new Date(iso).toLocaleString();
 }
 
-function IncidentRow(props: { incident: Incident }) {
+function IncidentRow(props: { api: PluginPanelApi; incident: Incident }) {
   const expanded = () => store.open().has(props.incident.id);
+  const text = () => [props.incident.title, ...props.incident.checks.map((c) => `- ${label(c)}`)].join("\n");
   return (
     <div class="gt-incident" data-incident={props.incident.id}>
-      <button class="gt-incident-head" classList={{ expanded: expanded() }} onClick={() => toggle(props.incident.id)}>
+      <button
+        class="gt-incident-head"
+        classList={{ expanded: expanded() }}
+        onClick={() => toggle(props.incident.id)}
+        onContextMenu={(e) => menuFor(props.api, e, props.incident.checks, text())}
+        onKeyDown={(e) => opensMenu(e) && menuFor(props.api, e, props.incident.checks, text())}
+      >
         <IconChevronRight size={12} />
         <span class="gt-dot" />
         <span class="gt-incident-title">{props.incident.title}</span>
@@ -57,7 +118,7 @@ function IncidentRow(props: { incident: Incident }) {
       </button>
       <Show when={expanded() && props.incident.checks.length > 0}>
         <ul class="gt-checks">
-          <For each={props.incident.checks}>{(c) => <li>{label(c)}</li>}</For>
+          <For each={props.incident.checks}>{(c) => <CheckRow api={props.api} check={c} />}</For>
         </ul>
       </Show>
     </div>
@@ -203,7 +264,7 @@ function GatusPanel(props: { api: PluginPanelApi }) {
 
           <Show when={s()!.incidents.length > 0} fallback={<div class="gt-empty">Nothing down.</div>}>
             <div class="gt-incidents">
-              <For each={s()!.incidents}>{(i) => <IncidentRow incident={i} />}</For>
+              <For each={s()!.incidents}>{(i) => <IncidentRow api={props.api} incident={i} />}</For>
             </div>
           </Show>
 
@@ -218,7 +279,7 @@ function GatusPanel(props: { api: PluginPanelApi }) {
             </button>
             <Show when={store.showQuiet()}>
               <ul class="gt-checks gt-quiet">
-                <For each={s()!.quiet}>{(c) => <li>{label(c)}</li>}</For>
+                <For each={s()!.quiet}>{(c) => <CheckRow api={props.api} check={c} />}</For>
               </ul>
             </Show>
           </Show>
@@ -236,6 +297,7 @@ function GatusPanel(props: { api: PluginPanelApi }) {
           <SettingsForm api={props.api} />
         </Show>
       </div>
+      <Show when={store.menu()}>{(m) => <ContextMenu menu={m()} onClose={() => store.setMenu(null)} />}</Show>
     </div>
   );
 }
@@ -244,6 +306,7 @@ function GatusPanel(props: { api: PluginPanelApi }) {
  *  function is called when the view closes. */
 export function mount(el: HTMLElement, api: PluginPanelApi): () => void {
   const offChanged = api.on("changed", (snap) => store.setSnap(snap as Snapshot));
+  const offCwd = api.onActiveCwd((cwd) => (activeCwd = cwd));
   // A clicked toast: show its incident open.
   const offReveal = api.onReveal((payload) => {
     const id = (payload as { incident?: unknown } | null)?.incident;
@@ -259,6 +322,8 @@ export function mount(el: HTMLElement, api: PluginPanelApi): () => void {
   return () => {
     dispose();
     offChanged();
+    offCwd();
     offReveal();
+    store.setMenu(null);
   };
 }
